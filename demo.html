@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><title>守口如瓶过滤器 · 演示页</title>
+<style>
+  body { max-width: 720px; margin: 40px auto; font: 15px/1.7 system-ui, "Microsoft YaHei"; color: #222; }
+  h1 { font-size: 22px; } .card { border: 1px solid #ddd; border-radius: 12px; padding: 18px; margin: 18px 0; }
+  textarea, input { width: 100%; box-sizing: border-box; padding: 10px; border: 1px solid #bbb; border-radius: 8px; font: inherit; }
+  .hint { color: #888; font-size: 12px; }
+  button { background: #d93025; color: #fff; border: 0; padding: 8px 18px; border-radius: 8px; font-weight: 700; cursor: pointer; }
+</style>
+</head>
+<body>
+  <h1>🤐 守口如瓶过滤器 · 演示页</h1>
+  <p>在下面的输入框里粘贴含敏感信息的内容，停止输入 0.6 秒后自动检测。</p>
+
+  <div class="card">
+    <b>场景 1：把报销单信息粘进 AI 聊天框</b>
+    <textarea rows="4" placeholder="粘贴含身份证/手机号的内容…">帮我总结这张报销单：姓名王小红，身份证 110101199003078515，手机 13812345678，金额 385.5 元，发票号 6222020200112345678。</textarea>
+    <div class="hint">预期：身份证/手机号/银行卡被标红，一键脱敏替换。</div>
+  </div>
+
+  <div class="card">
+    <b>场景 2：客服工单（含邮箱）</b>
+    <input placeholder="输入内容…">
+    <div class="hint">预期：邮箱被标记；无敏感信息时显示"未发现敏感信息"。</div>
+  </div>
+
+  <div class="card">
+    <b>模拟"发送"</b>
+    <button onclick="alert('真实产品里这里会先过一遍守口如瓶过滤器再发送；本演示直接展示检测面板。')">发送</button>
+    <div class="hint">演示视频脚本：粘贴 → 面板弹出（🔒 端侧） → 一键脱敏 → 发送干净文本。</div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "Loose Lips Filter — 守口如瓶过滤器",
+  "version": "0.2.0",
+  "description": "On-device AI catches what shouldn't leave your laptop, before you hit send. Fully offline detection with honest cloud fallback.",
+  "permissions": ["storage", "scripting"],
+  "host_permissions": ["<all_urls>"],
+  "background": { "service_worker": "bg.js" },
+  "content_scripts": [{ "matches": ["<all_urls>"], "js": ["content.js"], "run_at": "document_idle" }],
+  "action": { "default_popup": "popup.html" }
+}
