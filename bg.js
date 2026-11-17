@@ -45,16 +45,28 @@ function localRedact(text, hits) {
   return out;
 }
 
-// ---- 云端引擎：Firebase AI Logic（评分核心：hybrid inference）----
-// 上线前：npm i firebase 并填入你的 firebaseConfig；App Check debug token 见 README
+// ---- 云端引擎：Firebase AI Logic（hybrid inference 评分核心，真实接入）----
+import { initializeApp } from 'firebase/app';
+import { getAI, getGenerativeModel } from 'firebase/ai';
+import { firebaseConfig } from './firebase-config.js';
+
+let cloudModel = null;
+function getCloudModel() {
+  if (cloudModel) return cloudModel;
+  const app = initializeApp(firebaseConfig);
+  const ai = getAI(app);
+  cloudModel = getGenerativeModel(ai, { model: 'gemini-3.8-flash' });
+  return cloudModel;
+}
+
 async function cloudScan(text) {
-  // const { initializeApp } = await import('./firebase-app.js');
-  // const { getAI, getGenerativeModel } = await import('./firebase-ai.js');
-  // const ai = getAI(initializeApp(firebaseConfig));
-  // const model = getGenerativeModel(ai, { model: 'gemini-2.5-flash' });
-  // const res = await model.generateContent(`...同端侧 system 提示... ${text}`);
-  // return JSON.parse(res.response.text());
-  return null; // 竞赛骨架阶段：云端未配置时返回 null，由端侧保底
+  const model = getCloudModel();
+  const prompt =
+    '你是隐私审查器。只输出 JSON：{"sensitive":[{"type":"身份证|手机号|银行卡|邮箱|地址","span":"原文片段"}],"redacted":"把敏感片段用**掩码**替换后的全文"}。不确定的不算敏感。\n\n' +
+    text.slice(0, 30000);
+  const res = await model.generateContent(prompt);
+  const out = res.response.text();
+  return JSON.parse(out.match(/\{[\s\S]*\}/)[0]);
 }
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {

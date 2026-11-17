@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Raw Probe</title></head>
+<body style="font:13px monospace;white-space:pre-wrap;background:#111;color:#9f9;padding:16px">
+<div id="out">probing…</div>
+<script type="module">
+self.FIREBASE_APPCHECK_DEBUG_TOKEN = '6c1f3a2b-9d4e-4f8a-b7c2-1d3e5f7a9b11';
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js';
+import { initializeAppCheck, ReCaptchaEnterpriseProvider } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app-check.js';
+const cfg = { apiKey: 'AIzaSyApixx2TAWIfBV-cfj2mwoxhkL-z1ji5W8', authDomain: 'privacy-guard-ab2b1.firebaseapp.com', projectId: 'privacy-guard-ab2b1', appId: '1:116500378057:web:6b15d9a50ec936095e3818' };
+const out = document.getElementById('out');
+const app = initializeApp(cfg);
+const ac = initializeAppCheck(app, { provider: new ReCaptchaEnterpriseProvider('debug-key'), isTokenAutoRefreshEnabled: true });
+out.textContent += '\n[appcheck] init ok, waiting for token…';
+const token = await new Promise((res, rej) => {
+  let done = false;
+  ac.onTokenChanged(t => { if (!done) { done = true; res(t.token); } });
+  setTimeout(() => { if (!done) { done = true; rej(new Error('token timeout 12s')); } }, 12000);
+});
+out.textContent += '\n[token] ' + token.slice(0, 30) + '...len=' + token.length;
+const model = 'gemini-2.5-flash';
+const url = `https://firebasevertexai.googleapis.com/v1beta/projects/privacy-guard-ab2b1/models/${model}:generateContent`;
+const res2 = await fetch(url, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json', 'X-Firebase-AppCheck': token },
+  body: JSON.stringify({ contents: [{ parts: [{ text: '只输出JSON: {"ok":true}' }] }] }),
+});
+const txt = await res2.text();
+out.textContent += `\n[HTTP] ${res2.status}\n[BODY] ${txt.slice(0, 600)}`;
+</script>
+</body>
+</html>

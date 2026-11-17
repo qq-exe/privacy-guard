@@ -1,0 +1,15 @@
+{
+  "name": "loose-lips-filter",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "esbuild bg.js --bundle --format=iife --outfile=bg.bundle.js --target=chrome120 --log-level=warning"
+  },
+  "dependencies": {
+    "firebase": "^11.10.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}
