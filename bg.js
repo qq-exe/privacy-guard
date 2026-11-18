@@ -45,28 +45,84 @@ function localRedact(text, hits) {
   return out;
 }
 
-// ---- 云端引擎：Firebase AI Logic（hybrid inference 评分核心，真实接入）----
+// ---- 云端引擎：CF Worker 中转（首选，密钥在服务端）→ Gemini 直连 → Firebase AI Logic ----
 import { initializeApp } from 'firebase/app';
 import { getAI, getGenerativeModel } from 'firebase/ai';
-import { firebaseConfig } from './firebase-config.js';
+import { firebaseConfig, geminiDirectKey, geminiDirectModel } from './firebase-config.js';
+
+const RELAY_BASE = 'https://hello-world-fragrant-voice-cc89.wqq2207.workers.dev';
+
+const CLOUD_PROMPT =
+  '你是隐私审查器。只输出 JSON：{"sensitive":[{"type":"身份证|手机号|银行卡|邮箱|地址","span":"原文片段"}],"redacted":"把敏感片段用**掩码**替换后的全文"}。不确定的不算敏感。\n\n';
+
+function parseGeminiJson(data) {
+  const out = data.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || '';
+  return JSON.parse(out.match(/\{[\s\S]*\}/)[0]);
+}
+
+async function relayScan(text) {
+  const body = JSON.stringify({
+    contents: [{ role: 'user', parts: [{ text: CLOUD_PROMPT + text.slice(0, 30000) }] }],
+    generationConfig: { thinkingConfig: { thinkingBudget: 0 } },
+  });
+  let lastErr = null;
+  for (let i = 0; i < 3; i++) { // 503 高需求瞬时重试
+    if (i > 0) await new Promise(r => setTimeout(r, 3000 * i));
+    const res = await fetch(`${RELAY_BASE}/gemini/v1beta/models/${geminiDirectModel}:generateContent`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+    });
+    if (res.status === 503) { lastErr = new Error('relay 503'); continue; }
+    if (!res.ok) throw new Error('relay ' + res.status);
+    return parseGeminiJson(await res.json());
+  }
+  throw lastErr || new Error('relay failed');
+}
+
+async function geminiDirectScan(text) {
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${geminiDirectModel}:generateContent`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-goog-api-key': geminiDirectKey },
+      body: JSON.stringify({
+        contents: [{ role: 'user', parts: [{ text: CLOUD_PROMPT + text.slice(0, 30000) }] }],
+        generationConfig: { thinkingConfig: { thinkingBudget: 0 } }, // 关闭思考，秒级响应
+      }),
+    }
+  );
+  if (!res.ok) throw new Error('gemini-direct ' + res.status);
+  return parseGeminiJson(await res.json());
+}
 
 let cloudModel = null;
-function getCloudModel() {
-  if (cloudModel) return cloudModel;
-  const app = initializeApp(firebaseConfig);
-  const ai = getAI(app);
-  cloudModel = getGenerativeModel(ai, { model: 'gemini-3.8-flash' });
-  return cloudModel;
+async function firebaseScan(text) {
+  if (!cloudModel) {
+    const app = initializeApp(firebaseConfig);
+    const ai = getAI(app);
+    cloudModel = getGenerativeModel(ai, { model: 'gemini-2.5-flash' });
+  }
+  const res = await cloudModel.generateContent(CLOUD_PROMPT + text.slice(0, 30000));
+  const out = res.response.text();
+  return JSON.parse(out.match(/\{[\s\S]*\}/)[0]);
 }
 
 async function cloudScan(text) {
-  const model = getCloudModel();
-  const prompt =
-    '你是隐私审查器。只输出 JSON：{"sensitive":[{"type":"身份证|手机号|银行卡|邮箱|地址","span":"原文片段"}],"redacted":"把敏感片段用**掩码**替换后的全文"}。不确定的不算敏感。\n\n' +
-    text.slice(0, 30000);
-  const res = await model.generateContent(prompt);
-  const out = res.response.text();
-  return JSON.parse(out.match(/\{[\s\S]*\}/)[0]);
+  const attempts = [
+    ['relay', relayScan],
+    ['direct', geminiDirectScan],
+    ['firebase', firebaseScan],
+  ];
+  const errs = [];
+  for (const [name, fn] of attempts) {
+    try {
+      return await fn(text);
+    } catch (e) {
+      errs.push(name + '=' + (e.message || '').slice(0, 60));
+    }
+  }
+  throw new Error('cloud failed: ' + errs.join(' | '));
 }
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {

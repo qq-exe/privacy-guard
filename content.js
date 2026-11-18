@@ -2,9 +2,18 @@
 const PANEL_ID = '__llf_panel__';
 let debounceTimer = null;
 let enabled = true;
+let lang = 'zh';
 
-chrome.storage.sync.get({ enabled: true }, (cfg) => { enabled = cfg.enabled; });
-chrome.storage.onChanged.addListener((ch) => { if (ch.enabled) enabled = ch.enabled.newValue; });
+const PANEL_I18N = {
+  zh: { title: '守口如瓶过滤器', onDevice: '🔒 端侧检测 · 数据未离开本机', cloud: '☁ 本次检测在云端进行（长文档/端侧不可用）', redact: '一键脱敏替换', clean: '未发现敏感信息' },
+  en: { title: 'Loose Lips Filter', onDevice: '🔒 On-device scan · data never left this machine', cloud: '☁ This scan ran in the cloud (long doc / on-device unavailable)', redact: 'Redact with one click', clean: 'No sensitive content found' },
+};
+
+chrome.storage.sync.get({ enabled: true, lang: 'zh' }, (cfg) => { enabled = cfg.enabled; lang = cfg.lang || 'zh'; });
+chrome.storage.onChanged.addListener((ch) => {
+  if (ch.enabled) enabled = ch.enabled.newValue;
+  if (ch.lang) lang = ch.lang.newValue || 'zh';
+});
 
 const PATTERNS = [
   { type: '身份证', re: /\b[1-9]\d{5}(?:19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])\d{3}[\dXx]\b/g },
@@ -60,14 +69,15 @@ function showPanel(field, result, text) {
   const hits = result.sensitive || [];
   if (!hits.length && !result.cloud_used) return hidePanel();
   const panel = panelFor(field);
+  const t = PANEL_I18N[lang] || PANEL_I18N.zh;
   const tag = result.cloud_used
-    ? '<div style="color:#ffb86b">☁ 本次检测在云端进行（长文档/端侧不可用）</div>'
-    : '<div style="color:#50fa7b">🔒 端侧检测 · 数据未离开本机</div>';
+    ? `<div style="color:#ffb86b">${t.cloud}</div>`
+    : `<div style="color:#50fa7b">${t.onDevice}</div>`;
   const list = hits.map(h => `<div>• <b style="color:#ff5555">${h.type}</b> <code style="background:#333;padding:1px 5px;border-radius:4px">${maskSpan(h.span)}</code></div>`).join('');
   panel.innerHTML =
-    `<div style="font-weight:700;margin-bottom:4px">守口如瓶过滤器</div>${tag}` +
-    (list || '<div>未发现敏感信息</div>') +
-    (hits.length && result.redacted ? '<button id="__llf_fix__" style="margin-top:8px;background:#ff5555;border:0;color:#fff;border-radius:6px;padding:5px 12px;cursor:pointer;font-weight:700">一键脱敏替换</button>' : '');
+    `<div style="font-weight:700;margin-bottom:4px">${t.title}</div>${tag}` +
+    (list || `<div>${t.clean}</div>`) +
+    (hits.length && result.redacted ? `<button id="__llf_fix__" style="margin-top:8px;background:#ff5555;border:0;color:#fff;border-radius:6px;padding:5px 12px;cursor:pointer;font-weight:700">${t.redact}</button>` : '');
   panel.style.display = 'block';
   const btn = panel.querySelector('#__llf_fix__');
   if (btn) btn.onclick = () => {

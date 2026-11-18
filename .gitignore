@@ -3,3 +3,11 @@ bg.bundle.js
 package-lock.json
 aitest.html
 probe.html
+
+.gemini_key*
+_*.mjs
+_req.json
+_key2.txt
+
+keys.local.js
+bg.bundle.js

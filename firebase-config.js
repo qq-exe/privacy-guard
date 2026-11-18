@@ -7,3 +7,6 @@ export const firebaseConfig = {
   messagingSenderId: '116500378057',
   appId: '1:116500378057:web:6b15d9a50ec936095e3818',
 };
+
+// Gemini 直连密钥/模型放在 keys.local.js（gitignored），构建时内联
+export { geminiDirectKey, geminiDirectModel } from './keys.local.js';

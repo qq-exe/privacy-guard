@@ -1,27 +1,62 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><title>AI Logic 连通性测试</title></head>
+<html><head><meta charset="UTF-8"><title>AI 连通性测试</title></head>
 <body style="font:14px monospace;white-space:pre-wrap;background:#111;color:#9f9;padding:20px">
 <div id="out">测试中…</div>
 <script type="module">
+// 云端通路测试：Worker 中转（首选）→ Gemini 直连（备用）→ Firebase AI Logic（保底）
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js';
 import { getAI, getGenerativeModel } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-ai.js';
-import { initializeAppCheck, ReCaptchaEnterpriseProvider } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app-check.js';
-self.FIREBASE_APPCHECK_DEBUG_TOKEN = '6c1f3a2b-9d4e-4f8a-b7c2-1d3e5f7a9b11';
-const cfg = { apiKey: 'AIzaSyApixx2TAWIfBV-cfj2mwoxhkL-z1ji5W8', authDomain: 'privacy-guard-ab2b1.firebaseapp.com', projectId: 'privacy-guard-ab2b1', storageBucket: 'privacy-guard-ab2b1.firebasestorage.app', messagingSenderId: '116500378057', appId: '1:116500378057:web:6b15d9a50ec936095e3818' };
+import { firebaseConfig } from './firebase-config.js';
+const KEY = 'AQ.YOUR_AI_STUDIO_KEY_HERE'; // create one at aistudio.google.com/api-keys
 const out = document.getElementById('out');
+
+fetch('https://www.cloudflare.com/cdn-cgi/trace').then(r => r.text()).then(t => {
+  const info = t.split('\n').filter(l => /^ip=|^loc=|^colo=|^warp=/.test(l)).join(' ');
+  out.textContent += '\n[0] 出口: ' + info;
+}).catch(() => {});
+
+async function tryFetch(url, headers, body) {
+  const res = await fetch(url, { method: 'POST', headers, body });
+  if (!res.ok) return { fail: res.status };
+  const data = await res.json();
+  const txt = data.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || '';
+  return { txt };
+}
+
 try {
-  const app = initializeApp(cfg);
-  out.textContent += '\n[1] app initialized';
-  initializeAppCheck(app, { provider: new ReCaptchaEnterpriseProvider('debug-key-not-validated'), isTokenAutoRefreshEnabled: true });
-  const ai = getAI(app);
-  out.textContent += '\n[2] AI instance ok';
-  const model = getGenerativeModel(ai, { model: 'gemini-2.5-flash' });
-  out.textContent += '\n[3] model ok, calling…';
-  const res = await model.generateContent('只输出 JSON:{"ok":true}');
-  const txt = res.response.text();
-  out.textContent += '\n[SUCCESS] response: ' + txt.slice(0, 200);
+  const t0 = Date.now();
+  const body = JSON.stringify({
+    contents: [{ role: 'user', parts: [{ text: '只输出 JSON:{"ok":true}' }] }],
+    generationConfig: { thinkingConfig: { thinkingBudget: 0 } },
+  });
+
+  out.textContent += '\n[1] Worker 中转 …';
+  let r = await tryFetch(
+    'https://hello-world-fragrant-voice-cc89.wqq2207.workers.dev/gemini/v1beta/models/gemini-flash-latest:generateContent',
+    { 'Content-Type': 'application/json' }, body);
+  if (r.txt) out.textContent += `\n[SUCCESS] 中转 ${Date.now() - t0}ms: ` + r.txt.slice(0, 200);
+  else out.textContent += `\n[1a] 中转失败 ${r.fail}`;
+
+  if (!r.txt) {
+    out.textContent += '\n[2] Gemini 直连 …';
+    r = await tryFetch(
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent',
+      { 'Content-Type': 'application/json', 'X-goog-api-key': KEY }, body);
+    if (r.txt) out.textContent += `\n[SUCCESS] 直连 ${Date.now() - t0}ms: ` + r.txt.slice(0, 200);
+    else out.textContent += `\n[2a] 直连失败 ${r.fail}`;
+  }
+
+  if (!r.txt) {
+    out.textContent += '\n[3] Firebase AI Logic 保底 …';
+    const app = initializeApp(firebaseConfig);
+    const ai = getAI(app);
+    const model = getGenerativeModel(ai, { model: 'gemini-2.5-flash' });
+    const res = await model.generateContent('只输出 JSON:{"ok":true}');
+    out.textContent += '\n[SUCCESS] firebase: ' + res.response.text().slice(0, 200);
+  }
+  out.textContent += '\n（测试完成）';
 } catch (e) {
-  out.textContent += '\n[ERROR] ' + (e.message || e).slice(0, 500) + '\n[code] ' + (e.code || 'n/a');
+  out.textContent += '\n[ERROR] ' + (e.message || e).slice(0, 400);
 }
 </script>
 </body>

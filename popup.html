@@ -14,24 +14,28 @@
   .big { font-size: 22px; font-weight: 800; color: #ff5555; }
   .lbl { color: #999; font-size: 11px; }
   .foot { margin-top: 12px; color: #777; font-size: 10px; }
+  #langBtn { background: #24243e; color: #9fd0ff; border: 0; border-radius: 6px; padding: 3px 10px; font: 11px system-ui; cursor: pointer; font-weight: 700; }
 </style>
 </head>
 <body>
-  <h1>🤐 守口如瓶过滤器</h1>
-  <div class="sub">发送前拦截敏感信息 · 端侧 AI · 数据不出本机</div>
+  <div class="row" style="margin:0 0 4px">
+    <h1 style="margin:0">🤐 <span id="t_title">守口如瓶过滤器</span></h1>
+    <button id="langBtn">EN</button>
+  </div>
+  <div class="sub" id="t_sub"></div>
   <div class="row">
-    <span>实时保护</span>
+    <span id="t_protect">实时保护</span>
     <span class="badge on" id="st">RUNNING</span>
   </div>
   <div class="row">
-    <span>检测引擎</span>
-    <span id="engine" style="font-weight:700">端侧（正则+Gemini Nano）</span>
+    <span id="t_engine">检测引擎</span>
+    <span id="engine" style="font-weight:700"></span>
   </div>
   <div class="stat">
     <div class="big" id="cnt">0</div>
-    <div class="lbl">本次会话拦截的敏感内容条数</div>
+    <div class="lbl" id="t_stat"></div>
   </div>
-  <div class="foot"> hybrid inference：短文本端侧 Gemini Nano；长文档走 Firebase AI Logic 云端并明示。<br>Open source · #BuildHybridAI 2026</div>
+  <div class="foot" id="t_foot"></div>
   <script src="popup.js"></script>
 </body>
 </html>
